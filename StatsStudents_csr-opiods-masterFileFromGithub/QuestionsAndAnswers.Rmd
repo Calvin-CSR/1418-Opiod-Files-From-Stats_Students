@@ -1,0 +1,282 @@
+---
+title: "CSR Opioids Overview -- Questions and Answers"
+author: "Catherine DeJager, Sarah Gilbert, and Kaitlyn Westra"
+date: "December 17, 2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# load packages that are going to be used
+require(tidyverse)   # this loads mosaic, ggformula, etc. too
+require(ggformula)
+require(mosaic)
+require(car)
+require(MuMIn)
+require(glmmTMB)
+library(plotly)
+packageVersion('plotly')
+require(s245)
+require(geepack)
+library(janitor)
+```
+
+
+```{r, echo=FALSE}
+# reading in the data, so that we can have our figures here.
+
+load(file = "data/tedsd_2017.RData")
+
+tedsd_MI2017 <- filter(tedsd_puf_2017, STFIPS == 26)
+tedsd_MI2017 <- tedsd_MI2017 %>%
+  mutate(rowgroups = gl(n=(nrow(tedsd_MI2017)/250),
+                        k = 250))
+
+tedsd_MI2017 <- tedsd_MI2017 %>% 
+  mutate(OPIFLG = HERFLG==1 | METHFLG==1 | OPSYNFLG==1,
+         HER1 = SUB1==5, HER2 = SUB2==5, HER3 = SUB3==5, METH1 = SUB1==6, METH2 = SUB2==6,
+         METH3 = SUB3==6, OPSYN1 = SUB1==7, OPSYN2 = SUB1==7, OPSYN3 = SUB3==7)
+tedsd_MI2017 <- tedsd_MI2017 %>% mutate(OPI1 = HER1|METH1|OPSYN1, OPI2 =
+                                          HER2|METH2|OPSYN2, OPI3 = HER3|METH3|OPSYN3)
+tedsd_MI2017 <- tedsd_MI2017 %>% mutate(MULTIOPI = (OPI1 & OPI2) | (OPI1 & OPI3) | 
+                                          (OPI2 & OPI3))
+
+remove_nas <- function(df) {
+  M <- as.matrix(df)
+  M[M == -9] <- NA
+  result <- as.data.frame(M)
+  result <- result %>% na.omit()
+}
+
+tedsd_MI2017_notna <- tedsd_MI2017 %>% select(HERFLG, METHFLG, OPSYNFLG, OPIFLG, HER1,
+      HER2, HER3, METH1, METH2, METH3, OPSYN1, OPSYN2, OPSYN3, OPI1, OPI2, OPI3, MULTIOPI,
+      AGE, GENDER, RACE, MARSTAT, EDUC, EMPLOY, LIVARAG, ARRESTS, NOPRIOR, PSYPROB,
+      FREQ_ATND_SELF_HELP, LOS, PSOURCE, rowgroups)
+tedsd_MI2017_notna <- tedsd_MI2017_notna %>% remove_nas()
+
+tedsd_MI2017_notna <- tedsd_MI2017_notna %>% mutate(
+    AGE = factor(AGE, labels = c("12-14", "15-17", "18-20", "21-24", "25-29", "30-34",
+                                 "35-39", "40-44", "45-49", "50-54", "55-64", "65+")),
+    GENDER = factor(as.numeric(GENDER==2.0), labels = c("M", "F")),
+    RACE = factor(RACE, labels = c("AK Native", "American Indian", "Black", "White",
+                              "Asian", "Other", "Multiple", "HI/other pacific islander")),
+    MARSTAT = factor(MARSTAT, labels = c("Never", "Married", "Separated",
+                                         "Divorced/widowed")),
+    EDUC = factor(EDUC, labels = c("<=8", "9-11", "12 or GED", "13-15", "16+")),
+    EMPLOY = factor(EMPLOY, labels = c("Full-time", "Part-time", "Unemployed", 
+                                       "Not in labor force")),
+    LIVARAG = factor(LIVARAG, labels = c("Homeless", "Dependent", "Independent")),
+    ARRESTS = factor(ARRESTS, labels = c("0", "1", "2+")),
+    NOPRIOR = factor(NOPRIOR, labels = c("0", "1+")),
+    PSYPROB = factor(as.numeric(PSYPROB == 1)),
+    FREQ_ATND_SELF_HELP = factor(FREQ_ATND_SELF_HELP, labels = c("0", "1-3", "4-7",
+                                                                 "8-30")),
+    LOS = factor(LOS, labels = c(seq(from = 1, to = 30), "31-45", "46-60", "61-90",
+                                 "91-120", "121-180", "181-365", ">365")),
+    PSOURCE = factor(PSOURCE, labels = c("Individual", "Alcohol/drug use care provider",
+      "Other health care provider", "School", "Employer/EAP", "Other community", "Court"))
+    )
+tedsd_MI2017_notna <- tedsd_MI2017_notna %>% mutate_if(is.double, as.factor)
+
+tedsd_MI2017_opi <- tedsd_MI2017_notna %>% filter(OPIFLG == TRUE)
+
+tedsd_MI2017_los <- tedsd_MI2017 %>% select(HERFLG, METHFLG, OPSYNFLG, OPIFLG, HER1, HER2,
+      HER3, METH1, METH2, METH3, OPSYN1, OPSYN2, OPSYN3, OPI1, OPI2, OPI3, MULTIOPI, AGE,
+      GENDER, RACE, MARSTAT, EDUC, EMPLOY, LIVARAG, ARRESTS_D, SERVICES, METHUSE, DAYWAIT,
+      REASON, PSOURCE, NOPRIOR, PSYPROB, FREQ_ATND_SELF_HELP, LOS, rowgroups) %>% filter(OPIFLG == 1)
+tedsd_MI2017_los <- tedsd_MI2017_los %>% remove_nas()
+tedsd_MI2017_los <- tedsd_MI2017_los %>% mutate(LONGSTAY = as.numeric(LOS) > 13)
+tedsd_MI2017_los <- tedsd_MI2017_los %>% mutate(
+    AGE = factor(AGE, labels = c("15-17", "18-20", "21-24", "25-29", "30-34", "35-39",
+                                 "40-44", "45-49", "50-54", "55-64", "65+")),
+    EDUC = factor(EDUC, labels = c("<=8", "9-11", "12 or GED", "13-15", "16+")),
+    EMPLOY = factor(EMPLOY, labels = c("Full-time", "Part-time", "Unemployed", 
+                                       "Not in labor force")),
+    PSOURCE = factor(PSOURCE, labels = c("Individual", "Alcohol/drug use care provider",
+        "Other health care provider", "School", "Employer/EAP", "Other community",
+        "Court")),
+    FREQ_ATND_SELF_HELP = factor(FREQ_ATND_SELF_HELP, labels = c("0", "1-3", "4-7",
+                                                                 "8-30")),
+    LOS = factor(LOS, labels = c(seq(from = 1, to = 30), "31-45", "46-60", "61-90",
+                                 "91-120", "121-180", "181-365", ">365"))
+    )
+
+percents_graphs_tables <- function(form, ttl, my_df, horiz=FALSE) {
+  if (horiz) {
+    print(gf_percentsh(form, title=ttl, data=my_df))
+  }
+  else {
+    print(gf_percents(form, title=ttl, data=my_df))
+  }
+  # vars <- all.vars(form)
+  # t1 <- tabyl(my_df, predictor, response) %>% adorn_totals(c("row", "col")) %>% 
+  #   adorn_percentages("all") %>% adorn_pct_formatting(digits = 2) %>% adorn_ns() %>% adorn_title("combined")
+  # t1
+  #tally(~vars[[1]]|vars[[2]], format='percent', data=my_df) #%>% pander()
+}
+
+predict_model <- function(model,predictor){
+  orig_dat <- model@frame
+  fixed_vals <- get_fixed(orig_dat[,(2:ncol(orig_dat))])
+  new_dat <- get_new_data(orig_dat, predictor = predictor, fixed_vals)
+  return(predict(model, newdata = new_dat,
+                 type = 'response', allow.new.levels = TRUE))
+}
+
+boots_model <- function(model, predictor, predlabel, resplable) {
+  boot_dat <- bootMer(model, FUN = function(model) predict_model(model, predictor), 
+                      nsim = 1000, type = "parametric", use.u = FALSE)
+  orig_dat <- model@frame
+  fixed_vals <- get_fixed(orig_dat[,c(2:ncol(orig_dat))])
+  new_dat <- get_new_data(orig_dat, predictor = predictor, fixed_vals)
+  new_dat <- new_dat %>% 
+    mutate(prediction = apply(boot_dat$t, 2, mean),
+           CIlow = apply(boot_dat$t, 2, quantile, probs=0.025),
+           CIhigh = apply(boot_dat$t, 2, quantile, probs=0.975)
+           )
+  gf_point(prediction ~ predictor, data=new_dat) %>%
+    gf_labs(x=predlabel, y=resplabel) %>% 
+    gf_errorbar(CIlow + CIhigh ~ predictor, data=new_dat, width=0.3)
+}
+```
+
+## Executive Summary
+
+Our objective was to find predictors that were significant in predicting people who were admitted into treatment facilities for opioid use. We also wanted to find which predictors helped to predict people who were using multiple opioids at the time of admission, as well as predicting individuals who stayed in the treatment facility for over two weeks. The predictors that we considered were mainly either demographics or information about the person relating to the situation.
+
+
+We found that to predict opioid users being admitted to treatment facilities, it was important to consider living arrangement, employment status, being admitted previously, education, gender, and the frequency of attending self-help. Specifically, people who were more likely to be admitted to treatment facilities for opioid usage were females, were female and were divorced/widowed, were homeless, were dependents with a GED/12 years of education, had been admitted previously to a substance abuse treatment facility, and had attended a substance use self-help group 4-7 times in the past month. People that were less likely to be admitted for opioid use were divorced/widowed, not in labor force, lived as a dependent, had 9-11 years or 12/GED or 16+ years education, had attended a substance use self-help group 8-30 times in the past month, were unemployed and homeless, or were not in the labor force and homeless.
+
+To predict people using multiple opioids, the important predictors were age, gender, and being admitted previously. People who are more likely to be admitted for multiple opioid useage used other opiates & synthetics, non-prescription methadone, are 18 years or older, or are female. People who are less likely to be admitted for multiple opioid usage were those who used heroin, or had been admitted previously to a substance abuse treatment facility.
+
+We found that the important predictors for people that stayed in treatment facilities for over 2 weeks were referral source, frequency of attending self help, education, unemployment, age, and the use of synthetic and other opioids. Specifically, those that were more likely to have a longer stay were referred by their employer/EAP, court, a alcohol/drug use care provider, or another community, had attended a substance use self-help group in the past month, had 16+ years of education, or used other opioids & synthetics. Those that were likely to have a shorter stay were 18+ years old, and not in the labor force.
+
+
+\pagebreak
+
+
+
+
+## Key Questions & Answers
+
+#### Objective 1: Determine important predictors for people admitted for opioid use.
+The predictors that made it *more likely* for someone to be admitted for opioid use were:  
+- female  
+- female and divorced/widowed  
+- homeless  
+- living in a supervised setting or as a dependent, with GED/12 years of education  
+- being admitted previously  
+- attending substance use self-help group 4-7 times in the past month  
+
+The predictors that made it *less likely* for someone to be admitted for opioid use were:  
+- divorced/widowed  
+- not in labor force  
+- dependent living  
+- 9-11 years or 12/GED or 16+ years education  
+- self help 8-30 times in the past month  
+- unemployed and homeless  
+- not in labor force and homeless
+
+Interactions occured between the variables:  
+- Gender & Marital Status  
+- Gender & Employement Status  
+- Living Arrangement & Education  
+- Living Arrangement & Employment Status  
+- whether they had been admitted previously & Frequency of Attending Self Help.  
+Any significant interactions have been reported above.
+
+##### Figures:
+In addition to our Tableau interactive figure, see figures below...
+
+```{r, echo=FALSE}
+percents_graphs_tables(~GENDER|OPIFLG, "Effect of gender on opioid use", tedsd_MI2017_notna)
+tabyl(tedsd_MI2017_notna, GENDER, OPIFLG) %>% adorn_totals(c("row", "col")) %>% adorn_percentages("all") %>% adorn_pct_formatting(digits = 2) %>% adorn_ns() %>% adorn_title("combined") %>%
+  knitr::kable()
+```
+
+```{r, echo=FALSE}
+percents_graphs_tables(~MARSTAT|OPIFLG, "Effect of marital status on opioid use", tedsd_MI2017_notna, horiz=TRUE)
+tabyl(tedsd_MI2017_notna, MARSTAT, OPIFLG) %>% adorn_totals(c("row", "col")) %>% adorn_percentages("all") %>% adorn_pct_formatting(digits = 2) %>% adorn_ns() %>% adorn_title("combined") %>% knitr::kable()
+```
+
+```{r, echo=FALSE}
+percents_graphs_tables(~NOPRIOR|OPIFLG, "Effect of number of prior admissions on opioid use", tedsd_MI2017_notna)
+tabyl(tedsd_MI2017_notna, NOPRIOR, OPIFLG) %>% adorn_totals(c("row", "col")) %>% adorn_percentages("all") %>% adorn_pct_formatting(digits = 2) %>% adorn_ns() %>% adorn_title("combined") %>% knitr::kable()
+```
+
+\pagebreak
+
+#### Objective 2: Determine important predictors for people admitted for using multiple opioids (among opioid users).  
+The predictors that made it *more likely* for someone to be admitted for multiple opioid useage were:  
+- using other opiates & synthetics  
+- using non-prescription methadone  
+- 18 years or older  
+- female  
+
+The predictiors that made it *less likely* for someone to be admitted for multiple opioid usage were:  
+- using heroin  
+- having been admitted previously
+
+##### Figures:
+In addition to our Tableau interactive figure, see figures below...
+
+```{r, echo=FALSE}
+percents_graphs_tables(~AGE|MULTIOPI, "Effect of age on use of multiple opioids", tedsd_MI2017_opi, horiz=TRUE)
+tabyl(tedsd_MI2017_opi, AGE, MULTIOPI) %>% adorn_totals(c("row", "col")) %>% adorn_percentages("all") %>% adorn_pct_formatting(digits = 2) %>% adorn_ns() %>% adorn_title("combined") %>% knitr::kable()
+```
+
+```{r, echo=FALSE}
+percents_graphs_tables(~GENDER|MULTIOPI, "Effect of gender on use of multiple opioids", tedsd_MI2017_opi)
+tabyl(tedsd_MI2017_opi, GENDER, MULTIOPI) %>% adorn_totals(c("row", "col")) %>% adorn_percentages("all") %>% adorn_pct_formatting(digits = 2) %>% adorn_ns() %>% adorn_title("combined") %>% knitr::kable()
+```
+
+```{r, echo=FALSE}
+percents_graphs_tables(~NOPRIOR|MULTIOPI, "Effect of number of prior admissions on use of multiple opioids", tedsd_MI2017_opi)
+tabyl(tedsd_MI2017_opi, NOPRIOR, MULTIOPI) %>% adorn_totals(c("row", "col")) %>% adorn_percentages("all") %>% adorn_pct_formatting(digits = 2) %>% adorn_ns() %>% adorn_title("combined") %>% knitr::kable()
+```
+
+\pagebreak
+
+#### Objective 3: Determine important predictors for stays in treatment facilities of over 2 weeks.  
+
+The predictors that made it more likely for someone to have a *longer stay* were:  
+- referred by employer/EAP   
+- referred by court  
+- referred by alcohol/drug use care provider  
+- attended self-help in the past month  
+- referred by other community  
+- 16+ years of education  
+- other opioids & synthetics  
+
+The predictors that made it more likely for someone to have a *shorter stay* were:  
+- 18 years or older  
+- not in labor force  
+
+##### Figures:
+In addition to our Tableau interactive figure, see figures below...
+
+```{r, echo=FALSE}
+gf_percentsh(~ LOS, "Length of stay (among opioid users)", tedsd_MI2017_los)
+```
+
+```{r, echo=FALSE}
+percents_graphs_tables(~LONGSTAY, "Long stay (>13 days) vs short stay (among opioid users)", tedsd_MI2017_los)
+tabyl(tedsd_MI2017_los, LONGSTAY) %>% knitr::kable()
+```
+
+```{r, echo=FALSE}
+percents_graphs_tables(~FREQ_ATND_SELF_HELP|LONGSTAY, "Effect of attending self help on length of stay", tedsd_MI2017_los)
+tabyl(tedsd_MI2017_los, FREQ_ATND_SELF_HELP, LONGSTAY) %>% adorn_totals(c("row", "col")) %>% adorn_percentages("all") %>% adorn_pct_formatting(digits = 2) %>% adorn_ns() %>% adorn_title("combined") %>% knitr::kable()
+```
+
+```{r, echo=FALSE}
+percents_graphs_tables(~PSOURCE|LONGSTAY, "Effect of referral source on length of stay", tedsd_MI2017_los, horiz=TRUE)
+tabyl(tedsd_MI2017_los, PSOURCE, LONGSTAY) %>% adorn_totals(c("row", "col")) %>% adorn_percentages("all") %>% adorn_pct_formatting(digits = 2) %>% adorn_ns() %>% adorn_title("combined") %>% knitr::kable()
+```
+
+```{r, echo=FALSE}
+percents_graphs_tables(~OPSYNFLG|LONGSTAY, "Effect of use of other opioids and synthetics on length of stay", tedsd_MI2017_los, horiz=TRUE)
+tabyl(tedsd_MI2017_los, OPSYNFLG, LONGSTAY) %>% adorn_totals(c("row", "col")) %>% adorn_percentages("all") %>% adorn_pct_formatting(digits = 2) %>% adorn_ns() %>% adorn_title("combined") %>% knitr::kable()
+```

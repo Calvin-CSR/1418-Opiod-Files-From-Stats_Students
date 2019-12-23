@@ -1,0 +1,63 @@
+---
+title: "Key Questions & Key References"
+author: "Catherine DeJager, Sarah Gilbert, and Kaitlyn Westra"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  pdf_document:
+    fig_height: 2.2
+    fig_width: 4
+  html_document:
+    fig_height: 2.2
+    fig_width: 4
+  word_document:
+    fig_height: 2.2
+    fig_width: 4
+---
+
+```{r, setup, include = FALSE}
+# load packages that are going to be used
+require(tidyverse)   # this loads mosaic, ggformula, etc. too
+require(ggformula)
+require(mosaic)
+
+theme_set(theme_bw(base_size=12))     # change theme for ggplot2/ggformula
+
+knitr::opts_chunk$set(
+  echo = TRUE,      # for homework, always show R code (this is the default)
+  tidy = FALSE,     # display code as typed (rather than reformatted)
+  size = "small",   # slightly smaller font for code
+  message = FALSE, warning = FALSE) # don't print warnings or messages in compiled document. So you MUST check them in RStudio!
+```
+
+
+### Key Questions
+
+1. What are good predictors of admission to treatment for the use of heroin in Michigan?
+
+2. What are good predictors of admission to treatment for the use of other opiates and synthetics in Michigan?
+
+3. What are good predictors of admission to treatment for the use of heroin and other opiates and synthetics combined in Michigan?
+
+
+
+### Key References
+
+Michigan Legislature. Public Health Code, Act 368 of 1978, Section 333.17744e. (http://legislature.mi.gov/doc.aspx?mcl-333-17744e )  
+This gives us background information on Michigan's Standing Order Policy. In Michigan, as of March 28, 2017, you do not need a prescription to purchase opioid antagonists (drugs that attach to opioid receptors and prevents them from activating in cases where there could be a potential overdose).
+
+
+Website Article. Opioid Overdose Crisis, from the NIDA of the NIH. (https://www.drugabuse.gov/drugs-abuse/opioids/opioid-overdose-crisis)  
+This article from the National Institute on Drug Abuse includes the history of the opioid crisis. It began in the late 1990s, and the crisis seems to be getting worse over time. Opioids are very addictive, and the CDC's estimate of the economic burden is $78.5 billion per year. The article includes a graph of the rate of suspected opioid overdose for each quarter of the year from 2016 to 2017, by region of the U.S. The rate of suspected opioid overdose in this date range has been increasing. 
+
+
+Journal Article, 2017, "Opioid overdose prevention and naloxone rescue kits: what we know and what we don’t know" from the journal Addiction Science & Clinical Practice. (DOI 10.1186/s13722-016-0068-3)  
+- Who should receive opioid overdose education and naloxone rescue kits?
+  - people who use heroin (likely to be around people who might overdose)
+  - people who are friends/family/acquaintances of people who use opioids
+- Should all patients receiving opioid therapy be offered naloxone co-prescribing?
+  - a study says that reduced opioid related emergency department visits
+  - did not appear to alter opioid prescribing practices
+- How should the perception of risk compensation be addressed?
+  - studies have found no evidence of risk compensation
+
+

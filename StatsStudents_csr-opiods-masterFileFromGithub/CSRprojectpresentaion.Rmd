@@ -1,0 +1,61 @@
+---
+title: "CSR Project Presentation" 
+author: "By Catherine DeJager, Sarah Gilbert, and Kaitlyn Westra"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+## Our Partners.
+
+- We were partnered with the Center for Social Research here at Calvin.
+- They conduct social-scientific research projects, by taking data from collections to reporting.
+
+![Center for Social Research](csr_logo.png){width=700px}
+
+## Where we got our data.
+
+- We got our data from the Substance Abuse and Mental Health Data Archive.
+- We wanted to look at the discharges that happened during 2017 in Michigan only.
+- We were given a codebook about variables.
+
+# <span style="color:white">What variables predict whether a person entering treatment uses opioids or not?</span>
+
+## Model #1 -- Use of Opioids
+
+opiModel <- glmmTMB (OPIFLG ~ GENDER + MARSTAT + GENDER\*MARSTAT + GENDER\*EMPLOY + LIVARAG + LIVARAG\*EDUC + 
+                  LIVARAG*EMPLOY + NOPRIOR + FREQ_ATND_SELF_HELP + (1|rowgroups), 
+                  family=binomial(link="logit"), data=tedsd_MI2017_notna)
+                  
+
+# <span style="color:white">What variables predict whether a person entering treatment uses more than one kind of opioid?</span>
+
+
+## Model #2 -- More than 1 Type of Opioid
+
+multiOpiModel <- glmmTMB(MULTIOPI ~ HERFLG + METHFLG + OPSYNFLG + AGE + GENDER + MARSTAT +
+                      EDUC + EDUC\*LIVARAG + EDUC\*NOPRIOR + EMPLOY+ LIVARAG + ARRESTS +
+                      NOPRIOR + FREQ_ATND_SELF_HELP + (1|rowgroups), data = tedsd_MI2017_opi,
+                     family = binomial(link = "logit"))
+
+
+# <span style="color:white"> What variables predict the length of stay for a person who enters treatment for opioid use?</span>
+
+
+## Model #3 -- Length of Stay
+
+los_lrm <- glmmTMB(LONGSTAY ~ AGE + EDUC + EMPLOY + FREQ_ATND_SELF_HELP + PSOURCE + OPSYNFLG + (1|rowgroups), data=tedsd_MI2017_los, family=binomial(link = "logit"))
+
+## Challenges
+
+- ACFs
+- Choosing predictors
+- VIFs
+
+## Interactive Figure 
+
+
+

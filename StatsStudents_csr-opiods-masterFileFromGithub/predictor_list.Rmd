@@ -1,0 +1,122 @@
+---
+title: "Stat 245 -- HW ??"
+author: "A. Student"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document:
+    fig_height: 2.2
+    fig_width: 4
+  pdf_document:
+    fig_height: 2.2
+    fig_width: 4
+  word_document:
+    fig_height: 2.2
+    fig_width: 4
+---
+
+```{r, setup, include = FALSE}
+# load packages that are going to be used
+require(tidyverse)   # this loads mosaic, ggformula, etc. too
+require(ggformula)
+require(mosaic)
+
+# Some customization.  You can alter or delete as desired (if you know what you are doing).
+
+theme_set(theme_bw(base_size=12))     # change theme for ggplot2/ggformula
+
+knitr::opts_chunk$set(
+  echo = TRUE,      # for homework, always show R code (this is the default)
+  tidy = FALSE,     # display code as typed (rather than reformatted)
+  size = "small",   # slightly smaller font for code
+  message = FALSE, warning = FALSE) # don't print warnings or messages in compiled document. So you MUST check them in RStudio!
+```
+
+- AGE: Age at admission
+  - values: 1-12 (age categories)
+  - not all age categories contain the same number of years
+- GENDER: Biological sex
+  - values: 1-2 (male/female)
+  - < 0.1% missing
+- RACE: Race
+  - values: 1-9 (race categories)
+  - 1.5% missing
+  - not all states code race the same
+- MARSTAT: Marital status
+  - values: 1-4 (marital status categories)
+  - 23.8% missing
+- EDUC: Education
+  - values: 1-5 (education category)
+  - 3.0% missing
+- EMPLOY: Employment status at admission
+  - values: 1-4
+  - 2.6% missing
+  - seasonal workers coded at time of admission
+- EMPLOY_D: Employment status at discharge
+  - values: 1-4
+  - 15.7% missing
+- DETNLF and DETNLF_D: Detailed 'not in labor force' category
+  - look at if not in labor force category is significant
+- VET: Veteran status
+  - values: 1-2 (yes/no)
+  - Persons who served in the National Guard or Military Reserves are classified as veterans only if they were ever called or ordered to active duty, not counting the 4–6 months for initial training or yearly summer camps.
+  - missing: 8.4%
+- LIVARAG: Living arrangements at admission
+  - values: 1-3 (living category)
+  - 4.2% missing
+- LIVARAG_D: Living arrangements at discharge
+  - values: 1-3 (living category)
+  - 16.4% missing
+- ARRESTS: Number of arrests in the 30 days prior to admission
+  - values: 0-2 (categories)
+  - 11.8% missing
+- ARRESTS_D: Number of arrests in the 30 days prior to discharge
+  - values: 0-2 (categories)
+  - 16.6% missing
+- NOPRIOR: Number of previous substance use treatment episodes
+  - values: 0-1 (no/1+)
+  - 8.6% missing
+- DSMCRIT: DSM diagnosis (SuDS 4 or SuDS 19)
+  - the substance use problem that provides the reason for client encounter or treatment
+  - don't use unless we see a lot of PSYPROB
+  - values: 1-19 (categories)
+  - 41.3% missing (or no/deferred diagnosis), 2.23% missing/deferred in Michigan
+- PSYPROB: Co-occurring mental and substance use disorders
+  - values: 1-2 (yes/no)
+  - 13.8% missing
+- FREQ_ATND_SELF_HELP: Frequency of attendance at substance use self-help groups
+in the 30 days prior to admission
+  - values: 1-5 (categories)
+  - 26.6% missing
+- FREQ_ATND_SELF_HELP_D: Frequency of attendance at substance use self-help groups
+in the 30 days prior to discharge
+  - values: 1-5 (categories)
+  - 27.0% missing
+
+Ways to measure substance use
+- SUB1 and SUB1_D (primary substance)
+- ROUTE1: Usual route of administration (primary substance)
+- FREQ1 and FREQ1_D: Frequency of use at admission (primary substance)
+- FRSTUSE1: Age at first use (primary substance)
+- SUB, ROUTE, FREQ, and FRSTUSE for secondary and tertiary as well
+- HERFLG: Heroin reported at admission
+- METHFLG: Non-Rx methadone reported at admission
+- OPSYNFLG: Other opiates/synthetics reported at admission
+
+Potential responses
+- DAYWAIT: Number of days waiting to enter treatment
+  - 45.7% missing, 1.27% missing in Michigan
+- REASON: Reason for discharge or discontinuance of treatment
+  - values: 1-7 (categories)
+- LOS: Length of stay in treatment (days)
+  - values: 1-37 (categories)
+- PSOURCE: Treatment referral source
+  - values: 1-7 (categories)
+  - could be response, but not for opioid use
+  - 2.2% missing
+- SERVICES: Service setting at admission
+  - values: 1-8 (categories)
+- SERVICES_D: Service setting at discharge
+  - values: 1-8 (categories)
+- METHUSE: Planned medication-assisted opioid therapy
+  - values: 1-2 (yes/no)
+  - 4.5% missing

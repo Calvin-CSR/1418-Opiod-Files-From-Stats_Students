@@ -1,0 +1,66 @@
+---
+title: "Project Questionnaire"
+author: "Sarah Gilbert, Catherine DeJager, Kaitlyn Westra"
+date: '`October, 11, 2019`'
+output: 
+  html_document:
+    fig_height: 2.2
+    fig_width: 4
+  pdf_document:
+    fig_height: 2.2
+    fig_width: 4
+  word_document:
+    fig_height: 2.2
+    fig_width: 4
+---
+
+```{r, setup, include = FALSE}
+# load packages that are going to be used
+require(tidyverse)   # this loads mosaic, ggformula, etc. too
+require(ggformula)
+require(mosaic)
+
+# Some customization.  You can alter or delete as desired (if you know what you are doing).
+
+theme_set(theme_bw(base_size=12))     # change theme for ggplot2/ggformula
+
+knitr::opts_chunk$set(
+  echo = TRUE,      # for homework, always show R code (this is the default)
+  tidy = FALSE,     # display code as typed (rather than reformatted)
+  size = "small",   # slightly smaller font for code
+  message = FALSE, warning = FALSE) # don't print warnings or messages in compiled document. So you MUST check them in RStudio!
+```
+
+
+### 1. Project Partner
+We are working with the Calvin Center for Social Research; their mission is to learn more about the opioid crisis in Michigan and to determine the risk factors for opioid overdose. 
+
+### 2. Goals
+
+- What are good predictors of admission to treatment for opioid use in Michigan?
+- How does admission to treatment for opioid use in Michigan compare to other states?
+- What are trends of admission to treatment for opioid use over time?
+
+### 3. Data
+We already have the dataset - Treatment Episode Data Set (Discharges). It is avaiable in serval formats; we are using the .RData. A link to the data is https://www.datafiles.samhsa.gov/study-series/treatment-episode-data-set-discharges-teds-d-nid13520. As per our partner's request, we are looking primarily at 2017 data from Michigan.
+
+### 4 Background
+- The dataset has a codebook that describes how variables are encoded.
+- We will reference the breif overview on Nalaxone (a drug for treating opioid overdose) that our partners gave us. That document gives us links to many useful websites and articles.
+- We can show the document if requested.
+
+### 5 Data Tidying
+- The data has an indicator variable for herion use and an indicator variable for opioid use. We want to make an indicator variable that is 1 if herion use or opioid use are both 1 and 0 if herion use or opioid use are both 0. 
+- For some of our questions we will filter the data to only look at Michigan.
+- Remove rows that have missing values for the columns that we use. Missing or invalues values are coded as -9. 
+
+### 6 Current skills
+- We all know how to use R.
+- We have all used Excel, Sarah has more experince.
+- Kaitlyn has more experince in Tableau and GIS.
+- Catherine knows how to us git and github.
+- Catherine has some programing experince. 
+- Sarah has some presentation skills.
+
+### 7 Work Plan
+We will set up a recuring meeting on Mondays at 4:30pm. At this meeting we will assign tasks, discuss progress, and work together on some tasks. Also will spend time to email our project partners about our progress and to make sure we are staying on track. 

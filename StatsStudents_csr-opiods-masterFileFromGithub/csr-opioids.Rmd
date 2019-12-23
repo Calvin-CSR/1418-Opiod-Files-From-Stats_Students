@@ -1,0 +1,275 @@
+---
+title: "CSR Opioids"
+author: "Catherine DeJager, Sarah Gilbert, and Kaitlyn Westra"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document:
+    fig_height: 2.2
+    fig_width: 4
+  pdf_document:
+    fig_height: 2.2
+    fig_width: 4
+  word_document:
+    fig_height: 2.2
+    fig_width: 4
+---
+
+```{r, setup, include = FALSE}
+# load packages that are going to be used
+require(tidyverse)   # this loads mosaic, ggformula, etc. too
+require(ggformula)
+require(mosaic)
+require(plotly)
+require(car)
+require(MuMIn)
+
+# Some customization.  You can alter or delete as desired (if you know what you are doing).
+
+theme_set(theme_bw(base_size=12))     # change theme for ggplot2/ggformula
+
+knitr::opts_chunk$set(
+  echo = TRUE,      # for homework, always show R code (this is the default)
+  tidy = FALSE,     # display code as typed (rather than reformatted)
+  size = "small",   # slightly smaller font for code
+  message = FALSE, warning = FALSE) # don't print warnings or messages in compiled document. So you MUST check them in RStudio!
+```
+
+### Read in the data
+
+```{r}
+load(file = "data/tedsd_2017.RData")
+```
+
+```{R}
+glimpse(tedsd_puf_2017)
+```
+
+```{r}
+tedsd_MI2017 <- filter(tedsd_puf_2017, STFIPS == 26)
+```
+
+```{r}
+tedsd_MI2017 <- tedsd_MI2017 %>% 
+  mutate(OPIFLG = HERFLG==1 | METHFLG==1 | OPSYNFLG==1, # MULTIOPI = (HERFLG==1 & METHFLG==1) | (HERFLG==1 & OPSYNFLG==1) | (METHFLG==1 & OPSYNFLG==1),
+         HER1 = SUB1==5, HER2 = SUB2==5, HER3 = SUB3==5, METH1 = SUB1==6, METH2 = SUB2==6, METH3 = SUB3==6, OPSYN1 = SUB1==7, OPSYN2 = SUB1==7, OPSYN3 = SUB3==7)
+tedsd_MI2017 <- tedsd_MI2017 %>% mutate(OPI1 = HER1|METH1|OPSYN1, OPI2 = HER2|METH2|OPSYN2, OPI3 = HER3|METH3|OPSYN3)
+tedsd_MI2017 <- tedsd_MI2017 %>% mutate(MULTIOPI = (OPI1 & OPI2) | (OPI1 & OPI3) | (OPI2 & OPI3)) # FRSTOPI = ?
+```
+
+```{r}
+remove_nas <- function(df) {
+  M <- as.matrix(df)
+  M[M == -9] <- NA
+  result <- as.data.frame(M)
+  result <- result %>% na.omit()
+}
+```
+
+### Research Questions
+
+1. What variables predict whether a person entering treatment uses opioids or not?
+2. What variables predict whether a person entering treatment uses more than one kind of opioid?
+3. What variables predict the length of stay for a person who enters treatment for opioid use?
+
+#### 1. What variables predict whether a person entering treatment uses opioids or not?
+
+```{r}
+tedsd_MI2017_notna <- tedsd_MI2017 %>% select(HERFLG, METHFLG, OPSYNFLG, OPIFLG, HER1, HER2, HER3, METH1, METH2, METH3, OPSYN1, OPSYN2, OPSYN3, OPI1, OPI2, OPI3, MULTIOPI, AGE, GENDER, RACE, MARSTAT, EDUC, EMPLOY, LIVARAG, ARRESTS, NOPRIOR, PSYPROB, FREQ_ATND_SELF_HELP, LOS, PSOURCE)
+tedsd_MI2017_notna <- tedsd_MI2017_notna %>% remove_nas()
+glimpse(tedsd_MI2017_notna)
+```
+
+```{r}
+tedsd_MI2017_notna <- tedsd_MI2017_notna %>% mutate(
+    AGE = factor(AGE, labels = c("12-14", "15-17", "18-20", "21-24", "25-29", "30-34", "35-39", "40-44", "45-49", "50-54", "55-64", "65+")),
+    GENDER = factor(as.numeric(GENDER==2.0), labels = c("M", "F")),
+    RACE = factor(RACE, labels = c("AK Native", "American Indian", "Black", "White", "Asian", "Other", "Multiple", "HI/other pacific islander")),
+    MARSTAT = factor(MARSTAT, labels = c("Never", "Married", "Separated", "Divorced/widowed")),
+    EDUC = factor(EDUC, labels = c("<=8", "9-11", "12 or GED", "13-15", "16+")),
+    EMPLOY = factor(EMPLOY, labels = c("Full-time", "Part-time", "Unemployed", "Not in labor force")),
+    LIVARAG = factor(LIVARAG, labels = c("Homeless", "Dependent", "Independent")),
+    ARRESTS = factor(ARRESTS, labels = c("0", "1", "2+")),
+    NOPRIOR = factor(NOPRIOR, labels = c("0", "1+")),
+    PSYPROB = factor(as.numeric(PSYPROB == 1)),
+    FREQ_ATND_SELF_HELP = factor(FREQ_ATND_SELF_HELP, labels = c("0", "1-3", "4-7", "8-30")),
+    LOS = factor(LOS, labels = c(seq(from = 1, to = 30), "31-45", "46-60", "61-90", "91-120", "121-180", "181-365", ">365")),
+    PSOURCE = factor(PSOURCE, labels = c("Individual", "Alcohol/drug use care provider", "Other health care provider", "School", "Employer/EAP", "Other community", "Court"))
+    )
+tedsd_MI2017_notna <- tedsd_MI2017_notna %>% mutate_if(is.double, as.factor)
+glimpse(tedsd_MI2017_notna)
+```
+
+```{r}
+tedsd_MI2017_opi <- tedsd_MI2017_notna %>% filter(OPIFLG == 1)
+glimpse(tedsd_MI2017_opi)
+```
+
+```{r}
+percents_graphs_tables <- function(form, ttl, my_df, horiz=FALSE) {
+  if (horiz) {
+    print(gf_percentsh(form, title=ttl, data=my_df))
+  }
+  else {
+    print(gf_percents(form, title=ttl, data=my_df))
+  }
+  tally(form, format='percent', data=my_df)
+}
+```
+
+```{r}
+percents_graphs_tables(~HERFLG, "Heroin use in opioid users", tedsd_MI2017_opi)
+percents_graphs_tables(~METHFLG, "Non-prescription Methadone use in opioid users", tedsd_MI2017_opi)
+percents_graphs_tables(~OPSYNFLG, "Other Opiates and Synthetics use in opioid users", tedsd_MI2017_opi)
+```
+
+```{r}
+opi_mod <- glm(OPIFLG ~ AGE + GENDER + MARSTAT + EDUC + EMPLOY + LIVARAG + ARRESTS + NOPRIOR + FREQ_ATND_SELF_HELP, na.action = na.fail, family=binomial(link = "logit"), data=tedsd_MI2017_notna)
+```
+
+```{r}
+summary(opi_mod)
+```
+
+```{r}
+vif(opi_mod)
+```
+
+```{r}
+opi_mod <- glm(OPIFLG ~ RACE + GENDER + MARSTAT + EDUC + EMPLOY + LIVARAG + ARRESTS + NOPRIOR + FREQ_ATND_SELF_HELP, na.action = na.fail, family=binomial(link = "logit"), data=tedsd_MI2017_notna)
+summary(opi_mod)
+```
+
+```{r}
+d_res <- dredge(opi_mod, rank = "AIC")
+head(d_res, 10)
+```
+
+```{r}
+b_res <- dredge(opi_mod, rank = "BIC")
+head(b_res, 10)
+```
+
+```{r}
+interaction_mod <- glm(OPIFLG ~ GENDER + MARSTAT + GENDER*MARSTAT + EDUC + EMPLOY + GENDER*EMPLOY + EDUC*EMPLOY + LIVARAG + GENDER*LIVARAG + LIVARAG*EDUC + LIVARAG*EMPLOY + ARRESTS + NOPRIOR + GENDER*NOPRIOR + FREQ_ATND_SELF_HELP, na.action = na.fail, family=binomial(link = "logit"), data=tedsd_MI2017_notna)
+summary(interaction_mod)
+```
+
+```{r}
+interaction_mod <- glm(OPIFLG ~ GENDER + MARSTAT + GENDER*MARSTAT + GENDER*EMPLOY + LIVARAG + GENDER*LIVARAG + LIVARAG*EDUC + LIVARAG*EMPLOY + NOPRIOR + FREQ_ATND_SELF_HELP, na.action = na.fail, family=binomial(link = "logit"), data=tedsd_MI2017_notna)
+summary(interaction_mod)
+```
+
+```{r}
+vif(interaction_mod)
+```
+
+```{r}
+a_interaction_res <- dredge(interaction_mod)
+head(a_interaction_res, 10)
+```
+
+```{r}
+percents_graphs_tables(~OPIFLG | AGE, "Opioid use by age at admission", tedsd_MI2017_notna)
+percents_graphs_tables(~AGE, "Age at admission of Opioid users", tedsd_MI2017_opi)
+percents_graphs_tables(~OPIFLG | GENDER, "Opioid use by gender", tedsd_MI2017_notna)
+percents_graphs_tables(~GENDER, "Gender of Opioid users", tedsd_MI2017_opi)
+percents_graphs_tables(~OPIFLG | MARSTAT, "Opioid use by marital status", tedsd_MI2017_notna)
+percents_graphs_tables(~MARSTAT, "Marital status of Opioid users", tedsd_MI2017_opi)
+percents_graphs_tables(~OPIFLG | EDUC, "Opioid use by education level", tedsd_MI2017_notna)
+percents_graphs_tables(~EDUC, "Education level of Opioid users", tedsd_MI2017_opi)
+percents_graphs_tables(~OPIFLG | EMPLOY, "Opioid use by employment at admission", tedsd_MI2017_notna)
+percents_graphs_tables(~EMPLOY, "Employment at admission of opioid users", tedsd_MI2017_opi)
+percents_graphs_tables(~OPIFLG | LIVARAG, "Opioid use by age at admission", tedsd_MI2017_notna)
+percents_graphs_tables(~LIVARAG, "Age at admission of opioid users", tedsd_MI2017_opi)
+percents_graphs_tables(~OPIFLG | ARRESTS, "Opioid use by number of arrests in the 30 days prior to admission", tedsd_MI2017_notna)
+percents_graphs_tables(~ARRESTS, "Number of arrests in the 30 days prior to admission of opioid users", tedsd_MI2017_opi)
+percents_graphs_tables(~OPIFLG | NOPRIOR, "Opioid use by number of prior admissions", tedsd_MI2017_notna)
+percents_graphs_tables(~NOPRIOR, "Number of prior admissions for opioid users", tedsd_MI2017_opi)
+percents_graphs_tables(~OPIFLG | PSYPROB, "Opioid use by presence of co-occuring mental and substance use disorders", tedsd_MI2017_notna)
+percents_graphs_tables(~PSYPROB, "Presence of co-occuring mental and substance use disorders of opioid users", tedsd_MI2017_opi)
+percents_graphs_tables(~OPIFLG | FREQ_ATND_SELF_HELP, "Opioid use by frequency of attending self-help programs in the past month", tedsd_MI2017_notna)
+percents_graphs_tables(~FREQ_ATND_SELF_HELP, "Frequency of attending self-help programs in the past month of Opioid users", tedsd_MI2017_opi)
+```
+
+#### 2. What variables predict whether a person entering treatment uses more than one kind of opioid?
+
+```{r}
+percents_graphs_tables(~MULTIOPI | HERFLG, "Multiple opioid use by heroin use", tedsd_MI2017_notna)
+percents_graphs_tables(~MULTIOPI | METHFLG, "Multiple opioid use by non-prescription methadone use", tedsd_MI2017_notna)
+percents_graphs_tables(~MULTIOPI | OPSYNFLG, "Multiple opioid use by other opiates and synthetics use", tedsd_MI2017_notna)
+percents_graphs_tables(~MULTIOPI | AGE, "Multiple opioid use by age at admission", tedsd_MI2017_notna)
+percents_graphs_tables(~MULTIOPI | GENDER, "Multiple opioid use by gender", tedsd_MI2017_notna)
+percents_graphs_tables(~MULTIOPI | MARSTAT, "Multiple opioid use by marital status", tedsd_MI2017_notna)
+percents_graphs_tables(~MULTIOPI | EDUC, "Multiple opioid use by education level", tedsd_MI2017_notna)
+percents_graphs_tables(~MULTIOPI | EMPLOY, "Multiple opioid use by employment at admission", tedsd_MI2017_notna)
+percents_graphs_tables(~MULTIOPI | LIVARAG, "Multiple opioid use by age at admission", tedsd_MI2017_notna)
+percents_graphs_tables(~MULTIOPI | ARRESTS, "Multiple opioid use by number of arrests in the 30 days prior to admission", tedsd_MI2017_notna)
+percents_graphs_tables(~MULTIOPI | LIVARAG, "Multiple opioid use by living arrangement at admission", tedsd_MI2017_notna)
+percents_graphs_tables(~MULTIOPI | NOPRIOR, "Multiple opioid use by number of prior admissions", tedsd_MI2017_notna)
+percents_graphs_tables(~MULTIOPI | PSYPROB, "Multiple opioid use by presence of co-occuring mental and substance use disorders", tedsd_MI2017_notna)
+percents_graphs_tables(~MULTIOPI | FREQ_ATND_SELF_HELP, "Multiple opioid use by frequency of attending self-help programs in the past month", tedsd_MI2017_notna)
+```
+
+#### 3. What variables predict the length of stay for a person who enters treatment for opioid use?
+
+```{r}
+percents_graphs_tables(~LOS | OPIFLG, "Distribution of length of stay by opioid use", tedsd_MI2017_notna, horiz=TRUE)
+percents_graphs_tables(~LOS, "Distribution of length of stay for opioid users", tedsd_MI2017_opi, horiz=TRUE)
+```
+
+```{r}
+tedsd_MI2017_los <- tedsd_MI2017 %>% select(HERFLG, METHFLG, OPSYNFLG, OPIFLG, HER1, HER2, HER3, METH1, METH2, METH3, OPSYN1, OPSYN2, OPSYN3, OPI1, OPI2, OPI3, MULTIOPI, AGE, GENDER, RACE, MARSTAT, EDUC, EMPLOY, LIVARAG, ARRESTS_D, SERVICES, METHUSE, DAYWAIT, REASON, PSOURCE, NOPRIOR, PSYPROB, FREQ_ATND_SELF_HELP, LOS) %>% filter(OPIFLG == 1)
+glimpse(tedsd_MI2017_los)
+```
+
+```{r}
+tedsd_MI2017_los <- tedsd_MI2017_los %>% remove_nas()
+glimpse(tedsd_MI2017_los)
+```
+
+```{r}
+tally(~AGE, data=tedsd_MI2017_notna)
+tally(~AGE, data=tedsd_MI2017_opi)
+tally(~SERVICES, data=tedsd_MI2017_los)
+```
+
+```{r}
+tedsd_MI2017_los <- tedsd_MI2017_los %>% mutate(
+    AGE = factor(AGE, labels = c("15-17", "18-20", "21-24", "25-29", "30-34", "35-39", "40-44", "45-49", "50-54", "55-64", "65+")),
+    GENDER = factor(as.numeric(GENDER==2.0), labels = c("M", "F")),
+    RACE = factor(RACE, labels = c("AK Native", "American Indian", "Black", "White", "Asian", "Other", "Multiple", "HI/other pacific islander")),
+    MARSTAT = factor(MARSTAT, labels = c("Never", "Married", "Separated", "Divorced/widowed")),
+    EDUC = factor(EDUC, labels = c("<=8", "9-11", "12 or GED", "13-15", "16+")),
+    EMPLOY = factor(EMPLOY, labels = c("Full-time", "Part-time", "Unemployed", "Not in labor force")),
+    LIVARAG = factor(LIVARAG, labels = c("Homeless", "Dependent", "Independent")),
+    ARRESTS_D = factor(ARRESTS_D, labels = c("0", "1", "2+")),
+    SERVICES = factor(SERVICES, labels = c("Detox 24-hour outpatient", "Rehab/residential, <=30 days",
+                                           "Rehab/residential, >30 days", "Ambulatory, intensive outpatient", "Ambulatory, non-intensive outpatient", "Ambulatory, detoxification")),
+    DAYWAIT = factor(DAYWAIT, labels = c("0", "1-7", "8-14", "15-30", "31+")),
+    REASON = factor(REASON, labels = c("Treatment completed", "Dropped out of treatment", "Terminated by facility", "Transferred", "Incarcerated", "Death", "Other")),
+    PSOURCE = factor(PSOURCE, labels = c("Individual", "Alcohol/drug use care provider", "Other health care provider", "School", "Employer/EAP", "Other community", "Court")),
+    NOPRIOR = factor(NOPRIOR, labels = c("0", "1+")),
+    PSYPROB = factor(as.numeric(PSYPROB == 1)),
+    FREQ_ATND_SELF_HELP = factor(FREQ_ATND_SELF_HELP, labels = c("0", "1-3", "4-7", "8-30")),
+    LOS = factor(LOS, labels = c(seq(from = 1, to = 30), "31-45", "46-60", "61-90", "91-120", "121-180", "181-365", ">365"))
+    )
+tedsd_MI2017_los <- tedsd_MI2017_los %>% mutate_if(is.double, as.factor)
+```
+
+```{r}
+percents_graphs_tables(~LOS|AGE, "Length of stay of opioid users by age at admission", tedsd_MI2017_los, horiz=TRUE)
+percents_graphs_tables(~LOS|GENDER, "Length of stay of opioid users by gender", tedsd_MI2017_los, horiz=TRUE)
+percents_graphs_tables(~LOS|RACE, "Length of stay of opioid users by race", tedsd_MI2017_los, horiz=TRUE)
+percents_graphs_tables(~LOS|MARSTAT, "Length of stay of opioid users by marital status", tedsd_MI2017_los, horiz=TRUE)
+percents_graphs_tables(~LOS|EDUC, "Length of stay of opioid users by education level", tedsd_MI2017_los, horiz=TRUE)
+percents_graphs_tables(~LOS|EMPLOY, "Length of stay of opioid users by employment", tedsd_MI2017_los, horiz=TRUE)
+percents_graphs_tables(~LOS|LIVARAG, "Length of stay of opioid users by living arrangement at admission", tedsd_MI2017_los, horiz=TRUE)
+percents_graphs_tables(~LOS|ARRESTS_D, "Length of stay of opioid users by arrests in the 30 days prior to discharge", tedsd_MI2017_los, horiz=TRUE)
+percents_graphs_tables(~LOS|SERVICES, "Length of stay of opioid users by services", tedsd_MI2017_los, horiz=TRUE)
+percents_graphs_tables(~LOS|DAYWAIT, "Length of stay of opioid users by days waiting before admission", tedsd_MI2017_los, horiz=TRUE)
+percents_graphs_tables(~LOS|REASON, "Length of stay of opioid users by reason for discharge", tedsd_MI2017_los, horiz=TRUE)
+percents_graphs_tables(~LOS|PSOURCE, "Length of stay of opioid users by referral source", tedsd_MI2017_los, horiz=TRUE)
+percents_graphs_tables(~LOS|NOPRIOR, "Length of stay of opioid users by number of prior admissions", tedsd_MI2017_los, horiz=TRUE)
+percents_graphs_tables(~LOS|PSYPROB, "Length of stay of opioid users by presence of co-occuring mental and substance use disorders", tedsd_MI2017_los, horiz=TRUE)
+percents_graphs_tables(~LOS|FREQ_ATND_SELF_HELP, "Length of stay of opioid users by frequency of attending self-help programs in the past month", tedsd_MI2017_los, horiz=TRUE)
+```
